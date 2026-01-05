@@ -1,0 +1,45 @@
+{{- if  and .Values.gateway .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  namespace: {{ $.Values.global.namespace }}
+spec:
+  gatewayClassName: nginx
+  listeners:
+{{- range $listenerName, $listener := .Values.gateway.listeners }}
+    {{- if $listener.tls }}
+    # HTTPS Listener
+    - name: {{ $listener.host | replace "." "-" }}-https
+      hostname: {{ $listener.host | quote }}
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ $listener.tls }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    
+    # HTTP Listener (Automatic Redirect/Fallback)
+    - name: {{ $listener.host | replace "." "-" }}-http
+      hostname: {{ $listener.host | quote }}
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- else }}
+    # HTTP Only Listener
+    - name: {{ $listener.host | replace "." "-" }}-http
+      hostname: {{ $listener.host | quote }}
+      port: {{ $listener.port | default 80 }}
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- end }}
+{{- end }}
+{{- end }}

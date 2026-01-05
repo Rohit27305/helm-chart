@@ -1,0 +1,119 @@
+# Global Configuration
+global:
+  namespace: demo
+  image:
+    registry: docker.io
+    repository: rohitmakunai
+    pullPolicy: Always
+  imagePullSecrets: []
+
+# Application Configuration
+apps:
+  demo:
+    name: demo
+    replicas: 1
+
+    # Image
+    imageName: test
+    tag: blue     # if blueGreen is not available or disabled
+
+    # Blue Green
+    blueGreen:
+      enabled: false
+      blue:
+        tag: blue
+      green:
+        tag: green
+
+    # Resources & Auto-scaling
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+    # Ports
+    ports:
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+      grpcPort: 50051
+      grpcTargetPort: 50051
+      grpcNodePort: 31425
+
+    # Service
+    service:
+      type: NodePort
+
+# Gateway Configuration
+gateway: 
+  enabled: true
+  name: gateway
+
+  clientSettings:
+    name: gateway-client-settings
+    maxSize: "50"
+
+  listeners:
+    demo:
+      host: test-bg.makunaiglobal.ai
+      tls: tls-secret
+      sslRedirect: true
+      routes:
+        grpc:
+          path: /grpc
+          pathType: PathPrefix
+          backendRefs:
+            primary:
+              name: demo
+              port: 50051
+              weight: 100
+            green:
+              name: demo-green
+              port: 50051
+              weight: 0
+        http:
+          path: /
+          pathType: PathPrefix
+          backendRefs:
+            primary:
+              name: demo
+              port: 80
+              weight: 100
+            green:
+              name: demo-green
+              port: 80
+              weight: 0
+
+# RBAC Configuration
+rbac:
+  enabled: true
+  
+  # Namespace-level RBAC
+  namespace:
+    enabled: true
+    serviceAccountName: rbac-sa
+    tokenSecretName: rbac-token
+    roleName: rbac-role
+    roleBindingName: rbac-binding
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "services", "configmaps"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list", "watch"]
+
+  # Cluster-level RBAC
+  cluster:
+    enabled: true
+    serviceAccountName: rbac-cluster-sa
+    tokenSecretName: rbac-cluster-token
+    roleName: rbac-cluster-role
+    roleBindingName: rbac-cluster-binding
+    rules:
+      - apiGroups: [""]
+        resources: ["nodes", "namespaces"]
+        verbs: ["get", "list", "watch"]
